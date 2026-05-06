@@ -42,6 +42,8 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',system-ui,sans-serif;backg
 .snav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:2px solid #CBD5E0;display:flex;z-index:100;box-shadow:0 -4px 16px rgba(0,0,0,.12)}
 .sni{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 4px 12px;cursor:pointer;font-size:.7rem;color:#718096;gap:3px;font-weight:700;transition:all .2s;border-top:3px solid transparent}
 .sni.active{color:#1A56DB;background:#EBF4FF;border-top-color:#1A56DB}.sni .ni{font-size:1.4rem}
+.sni.locked{opacity:.4}
+.sni.locked .ni::after{content:'🔒';font-size:.7rem;position:relative;top:-6px;left:-2px}
 .leg-row{margin-top:10px;display:flex;flex-wrap:wrap;justify-content:center;gap:5px}
 .leg-chip{display:inline-block;padding:3px 8px;border-radius:11px;color:#fff;font-size:.68rem;font-weight:700;letter-spacing:.02em}
 .sp{display:none;padding-bottom:70px}.sp.active{display:block}
@@ -213,6 +215,11 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',system-ui,sans-serif;backg
 .sname{font-weight:700;font-size:.92rem}
 .smeta{font-size:.76rem;color:#718096;margin-top:2px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
 .staff-memo{margin-top:6px;padding:7px 9px;background:#FFFAF0;border-left:3px solid #DD6B20;border-radius:4px;font-size:.78rem;color:#4A5568;line-height:1.4;white-space:pre-wrap;word-break:break-word}
+.astaff-card{user-select:none;-webkit-user-select:none;touch-action:pan-y;transition:transform .15s,box-shadow .15s}
+.astaff-card.dragging{box-shadow:0 18px 40px rgba(0,0,0,.3)!important;transform:scale(1.03);z-index:9999;opacity:.95;transition:none}
+.drag-placeholder{background:#EBF4FF;border:2px dashed #1A56DB;border-radius:13px;margin-bottom:9px;box-sizing:border-box}
+.drag-grip{cursor:grab}
+.astaff-card.dragging .drag-grip{cursor:grabbing}
 .emp-b{padding:2px 7px;border-radius:20px;font-size:.68rem;font-weight:700}
 .eb-sesha{background:#EBF4FF;color:#1A56DB}.eb-baito{background:#FFFAF0;color:#DD6B20}
 .eb-flex{background:#FAF5FF;color:#553C9A}.eb-net{background:#F0FFF4;color:#276749}
@@ -508,6 +515,7 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',system-ui,sans-serif;backg
       </div>
       <button class="bp" onclick="addStaff()">追加する</button>
     </div>
+    <div style="font-size:.75rem;color:#A0AEC0;margin:8px 4px 6px">💡 スタッフ名を長押し→ドラッグで並び替えできます</div>
     <div id="staffListEl"></div>
   </div>
 
@@ -601,6 +609,14 @@ function attachListeners(){
   // スタッフ一覧
   db.collection('staffList').orderBy('createdAt','asc').onSnapshot(snap=>{
     S.staffList=snap.docs.map(d=>({id:d.id,...d.data()}));
+    // sortOrder で並び替え（未設定は末尾）
+    S.staffList.sort((a,b)=>{
+      const oa=a.sortOrder??99999, ob=b.sortOrder??99999;
+      if(oa!==ob) return oa-ob;
+      const ca=a.createdAt&&a.createdAt.toMillis?a.createdAt.toMillis():0;
+      const cb=b.createdAt&&b.createdAt.toMillis?b.createdAt.toMillis():0;
+      return ca-cb;
+    });
     buildStaffSel();
     if(adminActive()) renderAdminStats();
   },err=>console.error('staffList:',err));
@@ -725,6 +741,13 @@ function showView(id){
   document.getElementById(id).classList.add('active');
 }
 function switchSP(p){
+  // 確認・提出タブはシフト時間帯選択中のみアクセス可
+  if(p==='sum' && !S.activeShift){
+    showToast('⚠️ 先に勤務時間帯を選択してください');
+    const bar=document.querySelector('.shift-mode-bar');
+    if(bar){bar.style.outline='3px solid #E53E3E';bar.style.borderRadius='12px';setTimeout(()=>bar.style.outline='',2000);}
+    return;
+  }
   ['cal','sum'].forEach(x=>{
     document.getElementById('sp'+x.charAt(0).toUpperCase()+x.slice(1)).classList.toggle('active',x===p);
     document.getElementById('sni'+x.charAt(0).toUpperCase()+x.slice(1)).classList.toggle('active',x===p);
@@ -1056,6 +1079,11 @@ function renderShiftModeBar(){
       ph.style.display='block';
     }
   }
+  // 「確認・提出」タブのロック表示
+  const sniSum=document.getElementById('sniSum');
+  if(sniSum){
+    sniSum.classList.toggle('locked', !S.activeShift);
+  }
 }
 
 // =============================================
@@ -1292,9 +1320,9 @@ function renderAdminStaffList(){
     else if(sub.hasRequests){stbCls='stb-done';stbTxt=`✅ 提出済み(${sub.reqCount||0}件)`;}
     else{stbCls='stb-noreq';stbTxt='📭 希望なし';}
     const memoHtml=(sub&&sub.memo)?`<div class="staff-memo">📝 ${esc(sub.memo)}</div>`:'';
-    return `<div class="astaff-card">
-      <div class="sav">${esc(s.name.charAt(0))}</div>
-      <div class="sinfo">
+    return `<div class="astaff-card" data-id="${s.id}">
+      <div class="sav drag-grip">${esc(s.name.charAt(0))}</div>
+      <div class="sinfo drag-grip">
         <div class="sname">${esc(s.name)}</div>
         <div class="smeta">
           ${s.dept?`<span>${esc(s.dept)}</span>`:''}
@@ -1307,7 +1335,89 @@ function renderAdminStaffList(){
       <button class="ib del" onclick="removeStaff('${s.id}')">🗑️</button>
     </div>`;
   }).join('');
+  // 長押しドラッグの紐付け
+  el.querySelectorAll('.astaff-card').forEach(setupLongPressDrag);
 }
+// === Long-press drag for staff reordering ===
+let _drag=null, _press=null, _pressTimer=null;
+function setupLongPressDrag(card){
+  card.addEventListener('pointerdown',(e)=>{
+    if(e.target.closest('button')) return;
+    if(!e.target.closest('.drag-grip')) return;
+    _press={card,pointerId:e.pointerId,sx:e.clientX,sy:e.clientY};
+    _pressTimer=setTimeout(()=>{
+      if(!_press) return;
+      navigator.vibrate&&navigator.vibrate(40);
+      _startDrag(_press.card,_press);
+      _press=null;
+    },420);
+  });
+}
+function _startDrag(card,info){
+  const rect=card.getBoundingClientRect();
+  _drag={card,pointerId:info.pointerId,offsetY:info.sy-rect.top};
+  card.classList.add('dragging');
+  card.style.position='fixed';
+  card.style.top=rect.top+'px';
+  card.style.left=rect.left+'px';
+  card.style.width=rect.width+'px';
+  card.style.pointerEvents='none';
+  const ph=document.createElement('div');
+  ph.className='drag-placeholder';
+  ph.style.height=rect.height+'px';
+  card.parentNode.insertBefore(ph,card);
+  _drag.placeholder=ph;
+}
+document.addEventListener('pointermove',(e)=>{
+  if(_press&&!_drag){
+    if(Math.abs(e.clientX-_press.sx)>10||Math.abs(e.clientY-_press.sy)>10){
+      clearTimeout(_pressTimer);_press=null;_pressTimer=null;
+    }
+  }
+  if(_drag&&e.pointerId===_drag.pointerId){
+    e.preventDefault();
+    _drag.card.style.top=(e.clientY-_drag.offsetY)+'px';
+    const list=document.getElementById('staffListEl');
+    if(!list) return;
+    const cards=[...list.querySelectorAll('.astaff-card:not(.dragging)')];
+    let inserted=false;
+    for(const sib of cards){
+      const r=sib.getBoundingClientRect();
+      if(e.clientY<r.top+r.height/2){
+        list.insertBefore(_drag.placeholder,sib);
+        inserted=true;break;
+      }
+    }
+    if(!inserted) list.appendChild(_drag.placeholder);
+  }
+},{passive:false});
+async function _endDrag(){
+  if(!_drag) return;
+  const {card,placeholder}=_drag;
+  card.classList.remove('dragging');
+  card.style.position='';card.style.top='';card.style.left='';
+  card.style.width='';card.style.pointerEvents='';
+  placeholder.parentNode.insertBefore(card,placeholder);
+  placeholder.remove();
+  const list=document.getElementById('staffListEl');
+  const ids=[...list.querySelectorAll('.astaff-card')].map(c=>c.dataset.id);
+  _drag=null;
+  try{
+    const batch=db.batch();
+    ids.forEach((id,i)=>batch.update(db.collection('staffList').doc(id),{sortOrder:i}));
+    await batch.commit();
+    showToast('✅ 並び順を保存しました');
+  }catch(e){console.error('order save:',e);showToast('⚠️ 並び替えの保存に失敗');}
+}
+document.addEventListener('pointerup',(e)=>{
+  if(_pressTimer){clearTimeout(_pressTimer);_pressTimer=null;_press=null;}
+  if(_drag&&e.pointerId===_drag.pointerId)_endDrag();
+});
+document.addEventListener('pointercancel',(e)=>{
+  if(_pressTimer){clearTimeout(_pressTimer);_pressTimer=null;_press=null;}
+  if(_drag&&e.pointerId===_drag.pointerId)_endDrag();
+});
+
 async function addStaff(){
   const name=document.getElementById('newName').value.trim();
   if(!name){showToast('名前を入力してください');return;}
