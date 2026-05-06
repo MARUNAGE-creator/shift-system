@@ -39,9 +39,11 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',system-ui,sans-serif;backg
 .login-status.unsubmitted{background:#FEF3C7;color:#92400E;display:block}
 
 /* STAFF NAV */
-.snav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #E2E8F0;display:flex;z-index:100;box-shadow:0 -2px 10px rgba(0,0,0,.08)}
-.sni{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 4px 10px;cursor:pointer;font-size:.65rem;color:#A0AEC0;gap:2px;font-weight:600;transition:color .2s}
-.sni.active{color:#1A56DB}.sni .ni{font-size:1.3rem}
+.snav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:2px solid #CBD5E0;display:flex;z-index:100;box-shadow:0 -4px 16px rgba(0,0,0,.12)}
+.sni{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 4px 12px;cursor:pointer;font-size:.7rem;color:#718096;gap:3px;font-weight:700;transition:all .2s;border-top:3px solid transparent}
+.sni.active{color:#1A56DB;background:#EBF4FF;border-top-color:#1A56DB}.sni .ni{font-size:1.4rem}
+.leg-row{margin-top:10px;display:flex;flex-wrap:wrap;justify-content:center;gap:5px}
+.leg-chip{display:inline-block;padding:3px 8px;border-radius:11px;color:#fff;font-size:.68rem;font-weight:700;letter-spacing:.02em}
 .sp{display:none;padding-bottom:70px}.sp.active{display:block}
 
 /* CALENDAR */
@@ -79,6 +81,8 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',system-ui,sans-serif;backg
 .dtype{font-size:.62rem;padding:2px 4px;border-radius:4px;color:#fff;font-weight:700;margin-top:2px;max-width:60px;text-align:center;line-height:1.15;white-space:normal;word-break:keep-all}
 .dt-kyukyu{background:#E53E3E}.dt-tanshoku{background:#38A169}
 .dt-asa{background:#DD6B20}.dt-hiru{background:#2B6CB0}.dt-yoru{background:#553C9A}
+.dt-yukyu{background:#9F7AEA}
+.cday.sel-yukyu{background:#FAF5FF}
 .hlbl{font-size:.5rem;color:#E53E3E;text-align:center;line-height:1.1;max-width:46px;overflow:hidden;word-break:break-all;margin-top:1px}
 /* SHIFT MODE SELECTOR BAR (above calendar) */
 .shift-mode-bar{background:#fff;border-radius:12px;padding:10px 12px;margin-bottom:8px;box-shadow:0 2px 6px rgba(0,0,0,.06)}
@@ -98,6 +102,11 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',system-ui,sans-serif;backg
 .cday.sel-other{background:#E6FFFA}
 .smb-mod:active{opacity:.8}
 .smb-mode-hint{font-size:.7rem;color:#A0AEC0;margin-top:7px;text-align:center;line-height:1.4}
+.cal-placeholder{background:#fff;border:2px dashed #CBD5E0;border-radius:14px;padding:36px 20px;text-align:center;margin-top:8px}
+.cph-icon{font-size:2.4rem;margin-bottom:8px;animation:phBounce 1.6s ease-in-out infinite}
+.cph-title{font-size:1.05rem;font-weight:700;color:#2D3748;margin-bottom:8px}
+.cph-sub{font-size:.78rem;color:#718096;line-height:1.5}
+@keyframes phBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 
 /* SUMMARY PAGE */
 .swrap{padding:12px}
@@ -132,6 +141,7 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',system-ui,sans-serif;backg
 .btn-dm:active{transform:scale(.97)}
 .dm-shift{background:#DD6B20}
 .dm-kyu{background:#E53E3E}
+.dm-yukyu{background:#9F7AEA}
 .dm-time{background:#38A169}
 .dm-clear{background:#EDF2F7;color:#4A5568}
 .dm-close{background:transparent;color:#718096;border:1px solid #E2E8F0;margin-top:4px}
@@ -283,6 +293,7 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',system-ui,sans-serif;backg
     <div class="dm-acts">
       <button class="btn-dm dm-shift" id="dmBtnShift" onclick="dmAssignShift()" style="display:none"></button>
       <button class="btn-dm dm-kyu" onclick="dmSetKyukyu()">🛌 希望休にする</button>
+      <button class="btn-dm dm-yukyu" onclick="dmSetYukyu()">🌴 有給休暇にする</button>
       <button class="btn-dm dm-time" onclick="dmOpenTP()">⏱️ 時間を変更</button>
       <button class="btn-dm dm-clear" id="dmBtnClear" onclick="dmClear()" style="display:none">❌ この日を解除</button>
       <button class="btn-dm dm-close" onclick="closeDM()">閉じる</button>
@@ -429,11 +440,26 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',system-ui,sans-serif;backg
         </div>
         <div class="smb-mode-hint" id="smHint">選択なし：日付タップで 希望休 → 時間変更 → なし と切り替わります</div>
       </div>
-      <div class="cgrid">
-        <div class="chead"><div class="chc">日</div><div class="chc">月</div><div class="chc">火</div><div class="chc">水</div><div class="chc">木</div><div class="chc">金</div><div class="chc">土</div></div>
-        <div class="cdays" id="staffCalDays"></div>
+      <div id="calPlaceholder" class="cal-placeholder">
+        <div class="cph-icon">👆</div>
+        <div class="cph-title">勤務時間帯を選択してください</div>
+        <div class="cph-sub">朝勤・昼勤・夜勤・その他のいずれかを<br>タップするとカレンダーが表示されます</div>
       </div>
-      <div style="margin-top:9px;font-size:.72rem;color:#A0AEC0;text-align:center">赤＝希望休　緑＝時間変更　橙＝朝勤　青＝昼勤　紫＝夜勤</div>
+      <div id="calArea" style="display:none">
+        <div class="cgrid">
+          <div class="chead"><div class="chc">日</div><div class="chc">月</div><div class="chc">火</div><div class="chc">水</div><div class="chc">木</div><div class="chc">金</div><div class="chc">土</div></div>
+          <div class="cdays" id="staffCalDays"></div>
+        </div>
+        <div class="leg-row">
+          <span class="leg-chip" style="background:#E53E3E">希望休</span>
+          <span class="leg-chip" style="background:#9F7AEA">有給休暇</span>
+          <span class="leg-chip" style="background:#38A169">時間変更</span>
+          <span class="leg-chip" style="background:#DD6B20">朝勤</span>
+          <span class="leg-chip" style="background:#2B6CB0">昼勤</span>
+          <span class="leg-chip" style="background:#553C9A">夜勤</span>
+          <span class="leg-chip" style="background:#2C7A7B">その他</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -543,8 +569,8 @@ const db = firebase.firestore();
 const ADMIN_PW='mansou0102';
 const DAYNAMES=['日','月','火','水','木','金','土'];
 const SHIFT_TIMES={朝勤:'9:30〜18:30',昼勤:'12:00〜21:00',夜勤:'13:30〜22:30'};
-const TYPE_COLOR={希望休:'#E53E3E',時間変更:'#38A169',朝勤:'#DD6B20',昼勤:'#2B6CB0',夜勤:'#553C9A',その他:'#2C7A7B'};
-const TYPE_DTCLS={希望休:'dt-kyukyu',時間変更:'dt-tanshoku',朝勤:'dt-asa',昼勤:'dt-hiru',夜勤:'dt-yoru',その他:'dt-other'};
+const TYPE_COLOR={希望休:'#E53E3E',時間変更:'#38A169',朝勤:'#DD6B20',昼勤:'#2B6CB0',夜勤:'#553C9A',その他:'#2C7A7B',有給休暇:'#9F7AEA'};
+const TYPE_DTCLS={希望休:'dt-kyukyu',時間変更:'dt-tanshoku',朝勤:'dt-asa',昼勤:'dt-hiru',夜勤:'dt-yoru',その他:'dt-other',有給休暇:'dt-yukyu'};
 const EMP_CLS={社員:'eb-sesha',バイト:'eb-baito',フレックス:'eb-flex',ネット:'eb-net'};
 
 // =============================================
@@ -841,6 +867,7 @@ function renderStaffCal(){
     if(curType==='希望休')cls+=' sel-kyukyu';
     else if(curType==='時間変更')cls+=' sel-jikan';
     else if(curType==='その他')cls+=' sel-other';
+    else if(curType==='有給休暇')cls+=' sel-yukyu';
     else if(curType)cls+=' sel-shift';
     cell.className=cls;
     cell.onclick=()=>tapDate(ds);
@@ -875,21 +902,7 @@ function renderStaffCal(){
 // DATE INTERACTION
 // =============================================
 function tapDate(ds){
-  const cur=S.sel[ds];
-  const curType=cur?cur.type:null;
-
-  // 空の日付かつシフトモード選択中：即時割り当て
-  if(S.activeShift && !curType){
-    if(S.activeShift==='その他'){
-      S.sel[ds]={type:'その他',startTime:S.otherShiftTime.startTime,endTime:S.otherShiftTime.endTime};
-    } else {
-      S.sel[ds]={type:S.activeShift};
-    }
-    renderStaffCal();
-    return;
-  }
-
-  // それ以外：ポップアップで選択肢を表示
+  // 常にポップアップで選択肢を表示
   showDayMenu(ds);
 }
 
@@ -946,6 +959,13 @@ function dmAssignShift(){
 function dmSetKyukyu(){
   if(!S.dmDate) return;
   S.sel[S.dmDate]={type:'希望休'};
+  closeDM();
+  renderStaffCal();
+}
+
+function dmSetYukyu(){
+  if(!S.dmDate) return;
+  S.sel[S.dmDate]={type:'有給休暇'};
   closeDM();
   renderStaffCal();
 }
@@ -1017,11 +1037,23 @@ function renderShiftModeBar(){
   const hint=document.getElementById('smHint');
   if(hint){
     if(S.activeShift==='その他'){
-      hint.textContent=`✅ その他モード（${S.otherShiftTime.startTime}〜${S.otherShiftTime.endTime}）：日付タップで割り当て　もう一度で解除`;
+      hint.textContent=`✅ その他モード（${S.otherShiftTime.startTime}〜${S.otherShiftTime.endTime}）`;
     } else if(S.activeShift){
-      hint.textContent=`✅ ${S.activeShift}モード選択中：日付をタップして割り当て（もう一度で解除）`;
+      hint.textContent=`✅ ${S.activeShift}モード選択中`;
     } else {
-      hint.textContent='選択なし：日付タップで 希望休 → 時間変更 → なし と切り替わります';
+      hint.textContent='👇 上のボタンから勤務時間帯を選んでください';
+    }
+  }
+  // カレンダー表示の切替
+  const calArea=document.getElementById('calArea');
+  const ph=document.getElementById('calPlaceholder');
+  if(calArea && ph){
+    if(S.activeShift){
+      calArea.style.display='block';
+      ph.style.display='none';
+    } else {
+      calArea.style.display='none';
+      ph.style.display='block';
     }
   }
 }
@@ -1158,6 +1190,13 @@ function clearAll(){
 // SUBMISSION FLOW
 // =============================================
 function openCF(){
+  if(!S.activeShift){
+    showToast('⚠️ 先に勤務時間帯（朝勤・昼勤・夜勤・その他）を選択してください');
+    switchSP('cal');
+    const bar=document.querySelector('.shift-mode-bar');
+    if(bar){bar.style.outline='3px solid #E53E3E';bar.style.borderRadius='12px';setTimeout(()=>bar.style.outline='',2000);}
+    return;
+  }
   const entries=Object.entries(S.sel).sort(([a],[b])=>a.localeCompare(b));
   if(!entries.length){showToast('希望日を選択してください');return;}
   const list=document.getElementById('cfList');
