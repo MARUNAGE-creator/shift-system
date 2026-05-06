@@ -842,9 +842,18 @@ function tapDate(ds){
       S.sel[ds]={type:'その他',startTime:S.otherShiftTime.startTime,endTime:S.otherShiftTime.endTime};
     }
   } else if(S.activeShift){
-    // 朝勤/昼勤/夜勤モード：トグル
-    if(curType===S.activeShift){delete S.sel[ds];}
-    else{S.sel[ds]={type:S.activeShift};}
+    // 朝勤/昼勤/夜勤モード：1回目→割り当て、2回目→時間調整ダイヤル
+    if(curType===S.activeShift){
+      const defTimes=(SHIFT_TIMES[S.activeShift]||'09:00〜17:00').split('〜');
+      if(!S.sel[ds])S.sel[ds]={type:S.activeShift};
+      S.sel[ds].startTime=S.sel[ds].startTime||defTimes[0]||'09:00';
+      S.sel[ds].endTime=S.sel[ds].endTime||defTimes[1]||'17:00';
+      S.tpPrevEntry={...S.sel[ds]};
+      openTP(ds);
+      return;
+    } else {
+      S.sel[ds]={type:S.activeShift};
+    }
   } else {
     // サイクルモード：なし→希望休→時間変更（TP編集）→なし
     if(!curType||curType==='朝勤'||curType==='昼勤'||curType==='夜勤'){
