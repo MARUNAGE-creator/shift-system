@@ -255,6 +255,22 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',system-ui,sans-serif;backg
 .dlb-ico{font-size:3rem;margin-bottom:8px}
 .dlb-ttl{font-size:1.1rem;font-weight:700;color:#B45309;margin-bottom:10px}
 .dlb-msg{font-size:.95rem;color:#78350F;line-height:1.6;white-space:pre-wrap}
+.sal-summary{background:linear-gradient(135deg,#0F766E,#14B8A6);color:#fff;border-radius:14px;padding:18px 16px;margin-bottom:14px;text-align:center;box-shadow:0 6px 20px rgba(15,118,110,.25)}
+.sal-summary-lbl{font-size:.85rem;opacity:.9;margin-bottom:4px}
+.sal-summary-val{font-size:1.8rem;font-weight:800;letter-spacing:.02em}
+.sal-summary-meta{font-size:.7rem;opacity:.85;margin-top:6px}
+.sal-card{background:#fff;border-radius:13px;padding:14px;margin-bottom:11px;box-shadow:0 2px 8px rgba(0,0,0,.07)}
+.sal-card.sal-empty{padding:11px 14px;display:flex;justify-content:space-between;align-items:center;color:#A0AEC0}
+.sal-empty-msg{font-size:.85rem}
+.sal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;border-bottom:1px solid #E2E8F0;padding-bottom:8px}
+.sal-name{font-size:1.05rem;font-weight:800;color:#2D3748}
+.sal-hourly{font-size:.82rem;color:#718096;font-weight:600;background:#F7FAFC;padding:3px 9px;border-radius:10px}
+.sal-time{font-size:.85rem;color:#4A5568;margin-bottom:10px;line-height:1.6}
+.sal-tag{display:inline-block;background:#FEF3C7;color:#92400E;padding:1px 7px;border-radius:8px;font-size:.72rem;font-weight:700;margin-left:4px}
+.sal-rows{font-size:.92rem}
+.sal-row{display:flex;justify-content:space-between;padding:5px 0;color:#4A5568}
+.sal-row.sal-total{border-top:1px solid #E2E8F0;margin-top:5px;padding-top:9px;font-weight:800;color:#0F766E;font-size:1.05rem}
+.sal-add{color:#DD6B20;font-weight:700}
 .dl-banner{padding:11px 14px;border-radius:11px;margin-bottom:11px;font-size:.85rem;font-weight:700;text-align:center;line-height:1.4}
 .dl-banner.ok{background:#EFF6FF;color:#1E40AF;border:1px solid #BFDBFE}
 .dl-banner.warn{background:#FEF3C7;color:#92400E;border:1px solid #FCD34D}
@@ -403,6 +419,7 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',system-ui,sans-serif;backg
     <div class="fg"><label class="fl">雇用区分</label>
       <select class="fsel" id="editType"><option>社員</option><option>バイト</option><option>フレックス</option><option>ネット</option></select>
     </div>
+    <div class="fg"><label class="fl">時給（円）</label><input type="number" class="fi" id="editHourly" min="0" step="10" placeholder="例: 1200"></div>
     <div class="sacts">
       <button class="btn-c" onclick="closeEditDlg()">キャンセル</button>
       <button class="btn-s" onclick="saveEdit()">保 存</button>
@@ -514,6 +531,7 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',system-ui,sans-serif;backg
     <div class="atab active" id="atStaff" onclick="switchATab('staff')">スタッフ管理</div>
     <div class="atab" id="atCal" onclick="switchATab('cal')">シフト希望</div>
     <div class="atab" id="atExp" onclick="switchATab('exp')">データ出力</div>
+    <div class="atab" id="atSal" onclick="switchATab('sal')">💰 給与計算</div>
     <div class="atab" id="atSet" onclick="switchATab('set')">設定</div>
   </div>
 
@@ -536,6 +554,7 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',system-ui,sans-serif;backg
           <select class="fsel" id="newType"><option>社員</option><option>バイト</option><option>フレックス</option><option>ネット</option></select>
         </div>
       </div>
+      <div class="fg"><label class="fl">時給（円）</label><input type="number" class="fi" id="newHourly" min="0" step="10" placeholder="例: 1200（後から編集も可）"></div>
       <button class="bp" onclick="addStaff()">追加する</button>
     </div>
     <div style="font-size:.75rem;color:#A0AEC0;margin:8px 4px 6px">💡 スタッフ名を長押し→ドラッグで並び替えできます</div>
@@ -575,6 +594,18 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',system-ui,sans-serif;backg
       <div class="fg"><label class="fl">テンプレートファイル</label><input type="file" class="fi" id="tmplFile" accept=".xlsm,.xlsx"></div>
       <button class="btn-exp" onclick="importToTemplate()">⬇️ テンプレートに反映してダウンロード</button>
     </div>
+  </div>
+
+  <!-- SALARY TAB -->
+  <div class="ac" id="acSal" style="display:none">
+    <div class="exp-card">
+      <div class="exp-ttl">💰 月別給与計算</div>
+      <p style="font-size:.82rem;color:#718096;margin-bottom:10px;line-height:1.5">確定シフトのExcelファイルを取り込んで、各スタッフの給与を計算します。<br>計算式：基本給（時給×時間）＋ 残業手当(+25%) ＋ 深夜手当(+25%)<br>休憩：6時間以上の勤務で1時間自動控除</p>
+      <div class="fg"><label class="fl">対象月</label><input type="month" class="fi" id="salMonth" onchange="renderSalary()"></div>
+      <div class="fg"><label class="fl">確定シフトExcelファイル(.xlsm/.xlsx)</label><input type="file" class="fi" id="salFile" accept=".xlsm,.xlsx"></div>
+      <button class="btn-exp" onclick="importConfirmedShifts()">📁 アップロードして計算</button>
+    </div>
+    <div id="salResult"></div>
   </div>
 
   <!-- SETTINGS TAB -->
@@ -826,13 +857,14 @@ function switchSP(p){
   if(p==='sum'){renderSum();updateNoreqNote();}
 }
 function switchATab(t){
-  ['staff','cal','exp','set'].forEach(x=>{
+  ['staff','cal','exp','sal','set'].forEach(x=>{
     document.getElementById('at'+x.charAt(0).toUpperCase()+x.slice(1)).classList.toggle('active',x===t);
     document.getElementById('ac'+x.charAt(0).toUpperCase()+x.slice(1)).style.display=x===t?'':'none';
   });
   if(t==='cal')renderAdminCal();
   if(t==='staff')renderAdminStats();
   if(t==='set')renderSettings();
+  if(t==='sal')renderSalary();
 }
 
 // =============================================
@@ -1576,10 +1608,12 @@ async function addStaff(){
   if(!name){showToast('名前を入力してください');return;}
   const dept=document.getElementById('newDept').value.trim();
   const type=document.getElementById('newType').value;
+  const hourlyWage=parseInt(document.getElementById('newHourly').value)||0;
   try{
-    await DB.addStaff({name,dept,type});
+    await DB.addStaff({name,dept,type,hourlyWage});
     document.getElementById('newName').value='';
     document.getElementById('newDept').value='';
+    document.getElementById('newHourly').value='';
     showToast(`${name} さんを追加しました`);
   }catch(e){showToast('⚠️ 追加エラー');console.error(e);}
 }
@@ -1599,6 +1633,7 @@ function openEditDlg(id){
   document.getElementById('editName').value=s.name;
   document.getElementById('editDept').value=s.dept||'';
   document.getElementById('editType').value=s.type;
+  document.getElementById('editHourly').value=s.hourlyWage||'';
   document.getElementById('editDlg').classList.add('active');
 }
 function closeEditDlg(){document.getElementById('editDlg').classList.remove('active');}
@@ -1608,8 +1643,9 @@ async function saveEdit(){
   if(!name){showToast('名前を入力してください');return;}
   const dept=document.getElementById('editDept').value.trim();
   const type=document.getElementById('editType').value;
+  const hourlyWage=parseInt(document.getElementById('editHourly').value)||0;
   try{
-    await DB.updateStaff(id,{name,dept,type});
+    await DB.updateStaff(id,{name,dept,type,hourlyWage});
     closeEditDlg();showToast('更新しました');
   }catch(e){showToast('⚠️ 更新エラー');console.error(e);}
 }
@@ -1794,6 +1830,186 @@ async function saveSettings(){
   }catch(e){
     console.error(e);
     showToast('⚠️ 保存に失敗しました');
+  }
+}
+
+// =============================================
+// SALARY (Phase 1)
+// =============================================
+function _decToMin(d){return Math.round(d*60);}
+function _fmtYen(n){return '¥'+Math.round(n).toLocaleString('ja-JP');}
+function _fmtHM(min){const h=Math.floor(min/60);const m=min%60;return m?`${h}時間${m}分`:`${h}時間`;}
+
+function calcDayWage(startMin,endMin,hourly){
+  const totalMin=endMin-startMin;
+  if(totalMin<=0) return null;
+  // 休憩: 6時間(360分)以上で60分固定
+  const breakMin=totalMin>=360?60:0;
+  const workMin=totalMin-breakMin;
+  // 残業: 8時間(480分)超
+  const overtimeMin=Math.max(0,workMin-480);
+  // 深夜: 22:00(1320)〜24:00(1440)との重なり（休憩時間との重なりは簡易的に無視）
+  const nightMin=Math.max(0,Math.min(endMin,1440)-Math.max(startMin,1320));
+  const perMin=hourly/60;
+  const basePay=workMin*perMin;
+  const overtimePay=overtimeMin*perMin*0.25;
+  const nightPay=nightMin*perMin*0.25;
+  return {totalMin,breakMin,workMin,overtimeMin,nightMin,basePay,overtimePay,nightPay,
+          totalPay:basePay+overtimePay+nightPay};
+}
+
+function calcMonthWage(shifts,hourly){
+  let workMin=0,overtimeMin=0,nightMin=0;
+  let basePay=0,overtimePay=0,nightPay=0;
+  shifts.forEach(sh=>{
+    const r=calcDayWage(sh.startMin,sh.endMin,hourly);
+    if(!r) return;
+    workMin+=r.workMin;overtimeMin+=r.overtimeMin;nightMin+=r.nightMin;
+    basePay+=r.basePay;overtimePay+=r.overtimePay;nightPay+=r.nightPay;
+  });
+  return {workMin,overtimeMin,nightMin,
+    basePay:Math.round(basePay),
+    overtimePay:Math.round(overtimePay),
+    nightPay:Math.round(nightPay),
+    totalPay:Math.round(basePay+overtimePay+nightPay)};
+}
+
+async function importConfirmedShifts(){
+  const ym=document.getElementById('salMonth').value;
+  if(!ym){showToast('対象月を選んでください');return;}
+  const file=document.getElementById('salFile').files[0];
+  if(!file){showToast('Excelファイルを選んでください');return;}
+
+  showToast('処理中…');
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const sheetName=wb.SheetNames.includes('勤怠')?'勤怠':wb.SheetNames[0];
+    const ws=wb.Sheets[sheetName];
+    if(!ws){showToast('シートが見つかりません');return;}
+
+    const nameToRow={};
+    for(let r=25;r<=200;r+=2){
+      const c=ws['C'+r];
+      if(c&&c.v) nameToRow[_normName(c.v)]=r;
+    }
+
+    const [year,month]=ym.split('-').map(Number);
+    const daysInMonth=new Date(year,month,0).getDate();
+    const staffData={};
+    let processed=0;
+    const unmatched=[];
+
+    for(const staff of S.staffList){
+      const row=nameToRow[_normName(staff.name)];
+      if(!row){unmatched.push(staff.name);continue;}
+
+      const shifts=[];
+      for(let day=1;day<=daysInMonth;day++){
+        const sCol=4+(day-1)*3;
+        const eCol=sCol+1;
+        const sa=_colToLetter(sCol)+row, ea=_colToLetter(eCol)+row;
+        const sCell=ws[sa], eCell=ws[ea];
+        if(sCell&&eCell&&typeof sCell.v==='number'&&typeof eCell.v==='number'){
+          const sMin=_decToMin(sCell.v), eMin=_decToMin(eCell.v);
+          if(eMin>sMin) shifts.push({day,startMin:sMin,endMin:eMin});
+        }
+      }
+      const hourly=staff.hourlyWage||0;
+      const calc=calcMonthWage(shifts,hourly);
+      staffData[staff.id]={
+        staffName:staff.name,
+        hourlyWage:hourly,
+        shifts,
+        ...calc
+      };
+      processed++;
+    }
+
+    // Firestoreに保存
+    await db.collection('salaryCalcs').doc(ym).set({
+      yearMonth:ym,
+      staffData,
+      uploadedAt:TS()
+    });
+
+    let msg=`✅ ${processed}名分を計算しました`;
+    if(unmatched.length) msg+=`\n⚠️ 一致しないスタッフ: ${unmatched.join('、')}`;
+    showToast(msg.split('\n')[0]);
+    if(unmatched.length) alert(msg);
+    renderSalary();
+  }catch(e){
+    console.error(e);
+    showToast('⚠️ エラー: '+e.message);
+  }
+}
+
+async function renderSalary(){
+  const monthInput=document.getElementById('salMonth');
+  if(!monthInput.value){
+    // 初期値：今月
+    const d=new Date();
+    monthInput.value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  }
+  const ym=monthInput.value;
+  const result=document.getElementById('salResult');
+  result.innerHTML='<div style="text-align:center;color:#718096;padding:20px">読み込み中…</div>';
+
+  try{
+    const doc=await db.collection('salaryCalcs').doc(ym).get();
+    if(!doc.exists){
+      result.innerHTML=`<div class="exp-card" style="text-align:center;color:#718096;padding:30px">
+        <div style="font-size:2rem;margin-bottom:8px">📊</div>
+        <div style="font-weight:700;margin-bottom:4px">${ym} のデータがまだありません</div>
+        <div style="font-size:.85rem">上のフォームからExcelをアップロードしてください</div>
+      </div>`;
+      return;
+    }
+    const data=doc.data();
+    const staffData=data.staffData||{};
+
+    // スタッフ並び順に従って表示
+    const sortedStaff=S.staffList.filter(s=>staffData[s.id]||(s.hourlyWage||0)>0||true);
+
+    let totalAll=0;
+    const cards=sortedStaff.map(s=>{
+      const d=staffData[s.id];
+      if(!d){
+        return `<div class="sal-card sal-empty">
+          <div class="sal-name">${esc(s.name)}</div>
+          <div class="sal-empty-msg">📭 シフト未登録（0円）</div>
+        </div>`;
+      }
+      totalAll+=d.totalPay||0;
+      const hr=Math.floor(d.workMin/60);
+      const min=d.workMin%60;
+      return `<div class="sal-card">
+        <div class="sal-head">
+          <div class="sal-name">${esc(s.name)}</div>
+          <div class="sal-hourly">時給 ${(d.hourlyWage||0).toLocaleString()}円</div>
+        </div>
+        <div class="sal-time">労働時間: <strong>${hr}時間${min?min+'分':''}</strong>${d.overtimeMin?` <span class="sal-tag">残業 ${_fmtHM(d.overtimeMin)}</span>`:''}${d.nightMin?` <span class="sal-tag">深夜 ${_fmtHM(d.nightMin)}</span>`:''}</div>
+        <div class="sal-rows">
+          <div class="sal-row"><span>基本給</span><span>${_fmtYen(d.basePay)}</span></div>
+          ${d.overtimePay?`<div class="sal-row"><span>残業手当 (+25%)</span><span class="sal-add">+${_fmtYen(d.overtimePay)}</span></div>`:''}
+          ${d.nightPay?`<div class="sal-row"><span>深夜手当 (+25%)</span><span class="sal-add">+${_fmtYen(d.nightPay)}</span></div>`:''}
+          <div class="sal-row sal-total"><span>合計</span><span>${_fmtYen(d.totalPay)}</span></div>
+        </div>
+      </div>`;
+    }).join('');
+
+    const upDate=data.uploadedAt&&data.uploadedAt.toDate?data.uploadedAt.toDate().toLocaleString('ja-JP'):'';
+    result.innerHTML=`
+      <div class="sal-summary">
+        <div class="sal-summary-lbl">${ym} 全体合計</div>
+        <div class="sal-summary-val">${_fmtYen(totalAll)}</div>
+        ${upDate?`<div class="sal-summary-meta">最終更新: ${upDate}</div>`:''}
+      </div>
+      ${cards}
+    `;
+  }catch(e){
+    console.error(e);
+    result.innerHTML='<div style="color:#E53E3E;padding:20px">⚠️ エラー: '+e.message+'</div>';
   }
 }
 
