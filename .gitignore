@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.*
+!.env.example
+credentials/
+tokens.json
+*.token
+.claude/settings.local.json
+.claude/worktrees/
+.obsidian/workspace.json
