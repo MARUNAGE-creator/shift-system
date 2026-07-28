@@ -688,11 +688,16 @@ let S={
   allReqs:[],
   allSubs:[],
   settings:{deadlineEnabled:false,deadlineDay:15,deadlineMessage:'今月の締め切りは過ぎました。\n変更希望の場合は直接社員までご連絡ください。'},
+  // ログイン後に張るリスナーの解除関数（ログアウト時にまとめて解除）
+  sessionUnsubs:[],
+  isAdmin:false,
 };
 
 // =============================================
 // FIRESTORE リスナー（リアルタイム同期）
 // =============================================
+// ログイン画面に必要な最小限のリスナー。アプリ起動時に一度だけ張る。
+// shiftReqs / monthSubs はログイン後に役割別で張る（読み取り回数の節約）
 function attachListeners(){
   // スタッフ一覧
   db.collection('staffList').orderBy('createdAt','asc').onSnapshot(snap=>{
@@ -709,20 +714,6 @@ function attachListeners(){
     if(adminActive()) renderAdminStats();
   },err=>console.error('staffList:',err));
 
-  // シフト希望
-  db.collection('shiftReqs').onSnapshot(snap=>{
-    S.allReqs=snap.docs.map(d=>({id:d.id,...d.data()}));
-    if(S.user&&!S.isAdmin){loadStaffSelFromCache();renderStaffCal();}
-    if(adminActive()) renderAdminCal();
-  },err=>console.error('shiftReqs:',err));
-
-  // 月提出状況
-  db.collection('monthSubs').onSnapshot(snap=>{
-    S.allSubs=snap.docs.map(d=>({id:d.id,...d.data()}));
-    if(S.user&&!S.isAdmin) renderStaffCal();
-    if(adminActive()) renderAdminStats();
-  },err=>console.error('monthSubs:',err));
-
   // 設定（締め切り等）
   db.collection('settings').doc('global').onSnapshot(snap=>{
     if(snap.exists){
@@ -735,6 +726,48 @@ function attachListeners(){
       applyDeadlineToLogin();
     }
   },err=>console.error('settings:',err));
+}
+
+// スタッフ用：自分のデータだけ購読する（単一フィールド条件なので複合インデックス不要）
+function attachStaffListeners(staffId){
+  detachSessionListeners();
+  S.sessionUnsubs.push(
+    db.collection('shiftReqs').where('staffId','==',staffId).onSnapshot(snap=>{
+      S.allReqs=snap.docs.map(d=>({id:d.id,...d.data()}));
+      if(S.user&&!S.isAdmin){loadStaffSelFromCache();renderStaffCal();}
+    },err=>console.error('shiftReqs(staff):',err))
+  );
+  S.sessionUnsubs.push(
+    db.collection('monthSubs').where('staffId','==',staffId).onSnapshot(snap=>{
+      S.allSubs=snap.docs.map(d=>({id:d.id,...d.data()}));
+      if(S.user&&!S.isAdmin) renderStaffCal();
+    },err=>console.error('monthSubs(staff):',err))
+  );
+}
+
+// 管理者用：全件購読（過去月の閲覧・全データ出力・スタッフ削除に全件が必要）
+function attachAdminListeners(){
+  detachSessionListeners();
+  S.sessionUnsubs.push(
+    db.collection('shiftReqs').onSnapshot(snap=>{
+      S.allReqs=snap.docs.map(d=>({id:d.id,...d.data()}));
+      if(adminActive()) renderAdminCal();
+    },err=>console.error('shiftReqs(admin):',err))
+  );
+  S.sessionUnsubs.push(
+    db.collection('monthSubs').onSnapshot(snap=>{
+      S.allSubs=snap.docs.map(d=>({id:d.id,...d.data()}));
+      if(adminActive()) renderAdminStats();
+    },err=>console.error('monthSubs(admin):',err))
+  );
+}
+
+// ログアウト時にセッション用リスナーを解除（別ユーザーで再ログインした際の二重購読を防ぐ）
+function detachSessionListeners(){
+  S.sessionUnsubs.forEach(u=>{try{u();}catch(e){console.error('unsub:',e);}});
+  S.sessionUnsubs=[];
+  S.allReqs=[];
+  S.allSubs=[];
 }
 function adminActive(){return document.getElementById('adminView').classList.contains('active');}
 
@@ -984,7 +1017,9 @@ function doStaffLogin(){
   const staff=S.staffList.find(s=>s.id===v);
   if(!staff){setLErr('スタッフが見つかりません');return;}
   S.user=staff;
+  S.isAdmin=false;
   S.activeShift=null;
+  attachStaffListeners(staff.id); // 自分のデータのみ購読開始
   loadStaffSel();
   document.getElementById('staffHdrName').textContent=staff.name+' さん';
   showView('staffView');
@@ -994,12 +1029,15 @@ function doStaffLogin(){
 }
 function doAdminLogin(){
   if(document.getElementById('adminPw').value!==ADMIN_PW){setLErr('パスワードが違います');return;}
+  S.isAdmin=true;
+  attachAdminListeners(); // 全件購読開始
   showView('adminView');
   switchATab('staff');
 }
 function setLErr(m){document.getElementById('lerr').textContent=m;}
 function doLogout(){
-  S.user=null;S.sel={};
+  detachSessionListeners();
+  S.user=null;S.isAdmin=false;S.sel={};
   document.getElementById('adminPw').value='';
   document.getElementById('staffSel').value='';
   document.getElementById('loginStatus').className='login-status';
